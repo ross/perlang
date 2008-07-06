@@ -1,0 +1,10 @@
+sockets
+fork
+serilization
+error handling
+symbol table magic
+
+module becomes a remote service
+forked by client, only client (initially at least) can access
+services are wrapped up in an object, contains a hostname, port, ... everything required to get at it
+

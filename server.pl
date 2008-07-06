@@ -1,38 +1,37 @@
 #!/usr/bin/perl
 
-# server0.pl
-#--------------------
-
 use strict;
-use Socket;
+use warnings;
+use IO::Socket::SIPC;
 
-# use port 7890 as default
-my $port = shift || 7890;
-my $proto = getprotobyname('tcp');
+my $sipc = IO::Socket::SIPC->new(
+  socket_handler => 'IO::Socket::INET',
+  use_check_sum  => 1,
+);
 
-# create a socket, make it reusable
-socket(SERVER, PF_INET, SOCK_STREAM, $proto) or die "socket: $!";
-setsockopt(SERVER, SOL_SOCKET, SO_REUSEADDR, 1) or die "setsock: $!";
+$sipc->connect(
+  LocalAddr  => 'localhost',
+  LocalPort  => 50010,
+  Proto      => 'tcp',
+  Listen     => 10,
+  Reuse      => 1,
+) or die $sipc->errstr;
 
-# grab a port on this machine
-my $paddr = sockaddr_in($port, INADDR_ANY);
+$sipc->debug(1);
 
-# bind to a port, then listen
-bind(SERVER, $paddr) or die "bind: $!";
-listen(SERVER, SOMAXCONN) or die "listen: $!";
-print "SERVER started on port $port ";
-
-# accepting a connection
-my $client_addr;
-while ($client_addr = accept(CLIENT, SERVER))
-{
-# find out who connected
-  my ($client_port, $client_ip) = sockaddr_in($client_addr);
-  my $client_ipnum = inet_ntoa($client_ip);
-  my $client_host = gethostbyaddr($client_ip, AF_INET);
-# print who has connected
-  print "got a connection from: $client_host","[$client_ipnum] ";
-# send them a message, close connection
-  print CLIENT "Smile from the server\n";
-  close CLIENT;
+while ( 1 ) {
+  my $client;
+  while ( $client = $sipc->accept(10) ) {
+    print "connect from client: ", $client->sock->peerhost, "\n";
+    my $request = $client->read_raw or die $client->errstr;
+    next unless $request;
+    chomp($request);
+    warn "client says: $request\n";
+    $client->send({ foo => 'is foo', bar => 'is bar', baz => 'is baz'}) or die $client->errstr;
+    $client->disconnect or die $client->errstr;
+  }
+  die $sipc->errstr unless defined $client;
+  warn "server runs on a timeout, re-listen on socket\n";
 }
+
+$sipc->disconnect or die $sipc->errstr;

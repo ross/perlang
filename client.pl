@@ -1,25 +1,25 @@
 #!/usr/bin/perl
 
 use strict;
-use Socket;
+use warnings;
+use Data::Dumper;
+use IO::Socket::SIPC;
 
-# initialize host and port
-my $host = shift || 'localhost';
-my $port = shift || 7890;
+my $sipc = IO::Socket::SIPC->new(
+  socket_handler => 'IO::Socket::INET',
+  use_check_sum  => 1,
+);
 
-my $proto = getprotobyname('tcp');
+$sipc->connect(
+  PeerAddr => 'localhost',
+  PeerPort => 50010,
+  Proto    => 'tcp',
+) or die $sipc->errstr;
 
-# get the port address
-my $iaddr = inet_aton($host);
-my $paddr = sockaddr_in($port, $iaddr);
-# create the socket, connect to the port
-socket(SOCKET, PF_INET, SOCK_STREAM, $proto)
-  or die "socket: $!";
-connect(SOCKET, $paddr) or die "connect: $!";
+$sipc->debug(1);
 
-my $line;
-while ($line = <SOCKET>)
-{
-  print $line;
-}
-close SOCKET or die "close: $!";
+$sipc->send_raw("Hello server, gimme some data :-)\n") or die $sipc->errstr;
+my $answer = $sipc->read or die $sipc->errstr;
+warn "server data: \n";
+warn Dumper($answer);
+$sipc->disconnect or die $sipc->errstr;
